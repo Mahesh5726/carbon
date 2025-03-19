@@ -1,5 +1,26 @@
 datasource db {
-  provider  = "postgresql"
-  url  	    = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  id           String   @id @default(uuid())
+  name         String
+  dateOfBirth  DateTime
+  aadharNumber String   @unique
+}
+
+model Professor {
+  id String @id @default(uuid())
+  name String
+  seniority Seniority
+  aadharNumber String @unique
+}
+
+enum Seniority{
+  JUNIOR
+  SENIOR
+  ASSOCIATE
+  HEAD
 }
 

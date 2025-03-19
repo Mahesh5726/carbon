@@ -9,7 +9,8 @@ app.get("/students", async (context) => {
   try {
     const student = await prisma.student.findMany();
     return context.json(student);
-  } catch {
+  } catch (error) {
+    console.error("Error finding student data: ", error);
     return context.json("404 Error: Data not found.", 404);
   }
 });
@@ -22,7 +23,8 @@ app.get("/students/enriched", async (context) => {
       },
     });
     return context.json(enriched);
-  } catch {
+  } catch (error) {
+    console.error("Error finding student's proctorship data: ", error);
     return context.json("404 Error: Data not found.", 404);
   }
 });
@@ -31,14 +33,14 @@ app.get("/professors", async (context) => {
   try {
     const professor = await prisma.professor.findMany();
     return context.json(professor);
-  } catch {
+  } catch (error) {
+    console.error("Error finding professor data: ", error);
     return context.json("404 Error: Data not found.", 404);
   }
 });
 
 app.post("/students", async (context) => {
-  const { name, dateOfBirth, aadharNumber, proctorId } =
-    await context.req.json();
+  const { name, dateOfBirth, aadharNumber } = await context.req.json();
   try {
     const aadharExists = await prisma.student.findUnique({
       where: {
@@ -54,11 +56,11 @@ app.post("/students", async (context) => {
         name: name,
         dateOfBirth: dateOfBirth,
         aadharNumber: aadharNumber,
-        proctorId: proctorId,
       },
     });
     return context.json(student, 200);
-  } catch {
+  } catch (error) {
+    console.error("Error creating student: ", error);
     return context.json("404 Error: Unable to create a student data.", 400);
   }
 });
@@ -85,7 +87,8 @@ app.post("/professors", async (context) => {
     });
 
     return context.json(prof, 200);
-  } catch {
+  } catch (error) {
+    console.error("Error creating professor: ", error);
     return context.json("404 Error: Unable to create a professor data.", 404);
   }
 });
@@ -99,14 +102,16 @@ app.get("/professors/:professorId/proctorships", async (context) => {
       },
     });
     return context.json(students);
-  } catch {
+  } catch (error) {
+    console.error("Error finding proctorship: ", error);
     return context.json("404 Error: Unable to find proctorships.", 404);
   }
 });
 
 app.patch("/students/:studentId", async (context) => {
   const studentId = context.req.param("studentId");
-  const { name, dateOfBirth, aadharNumber, proctorId } = await context.req.json();
+  const { name, dateOfBirth, aadharNumber, proctorId } =
+    await context.req.json();
   try {
     const uniqueStudentId = await prisma.student.findUnique({
       where: {
@@ -127,13 +132,12 @@ app.patch("/students/:studentId", async (context) => {
         name: name,
         dateOfBirth: dateOfBirth,
         aadharNumber: aadharNumber,
-        proctorId: proctorId
-      }
+        proctorId: proctorId,
+      },
     });
     return context.json(student, 200);
-  }
-
-  catch {
+  } catch (error) {
+    console.error("Error updating student data: ", error);
     return context.json("404 Error: Unable to update student data.", 404);
   }
 });
@@ -162,12 +166,11 @@ app.patch("/professors/:professorId", async (context) => {
       },
     });
     return context.json(professor, 200);
-    
-  } catch{
+  } catch (error) {
+    console.error("Error updating professor data: ", error);
     return context.json("404 Error: Unable to update professor data.", 404);
   }
 });
-
 
 app.delete("/students/:studentId", async (context) => {
   const studentId = context.req.param("studentId");
@@ -177,23 +180,22 @@ app.delete("/students/:studentId", async (context) => {
         id: studentId,
       },
     });
-    
+
     if (!uniqueStudentId) {
       return context.json("404 Error: Unable to find student data.", 404);
     }
-    
+
     const deletedStudent = await prisma.student.delete({
       where: {
         id: studentId,
       },
     });
-    
+
     return context.json({ "Deleted Student": deletedStudent }, 200);
-  }
-  catch {
+  } catch (error) {
+    console.error("Error deleting student data: ", error);
     return context.json("404 Error: Unable to delete student data.", 404);
   }
-
 });
 
 app.delete("/professors/:professorId", async (context) => {
@@ -216,10 +218,44 @@ app.delete("/professors/:professorId", async (context) => {
     });
 
     return context.json({ "Deleted Professor": deletedProfessor }, 200);
-  } catch {
+  } catch (error) {
+    console.error("Error deleting professor data: ", error);
     return context.json("404 Error: Unable to delete professor data.", 404);
   }
 });
 
+app.post("/professors/:professorId/proctorships", async (context) => {
+  const profId = context.req.param("professorId");
+  const { studentId } = await context.req.json();
+
+  try {
+    const existProf = await prisma.professor.findUnique({
+      where: { id: profId },
+    });
+    if (!existProf) {
+      return context.json("404 Error: Unable to find professor data.", 404);
+    }
+
+    const existStudent = await prisma.student.findUnique({
+      where: { id: studentId },
+    });
+    if (!existStudent) {
+      return context.json("404 Error: Unable to find student data.", 404);
+    }
+
+    const updateStudentProctorship = await prisma.student.update({
+      where: { id: studentId },
+      data: { proctorId: profId },
+    });
+
+    return context.json(
+      { "Updated Student Proctorship ": updateStudentProctorship },
+      200
+    );
+  } catch (error) {
+    console.error("Error assigning student proctorship: ", error);
+    return context.json("404 Error: Unable to assign student proctorship", 404);
+  }
+});
 
 serve(app);

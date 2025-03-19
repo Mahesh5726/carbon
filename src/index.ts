@@ -230,22 +230,30 @@ app.post("/professors/:professorId/proctorships", async (context) => {
 
   try {
     const existProf = await prisma.professor.findUnique({
-      where: { id: profId },
+      where: {
+        id: profId
+      },
     });
     if (!existProf) {
       return context.json("404 Error: Unable to find professor data.", 404);
     }
 
     const existStudent = await prisma.student.findUnique({
-      where: { id: studentId },
+      where: {
+        id: studentId
+      },
     });
     if (!existStudent) {
       return context.json("404 Error: Unable to find student data.", 404);
     }
 
     const updateStudentProctorship = await prisma.student.update({
-      where: { id: studentId },
-      data: { proctorId: profId },
+      where: {
+        id: studentId
+      },
+      data: {
+        proctorId: profId
+      },
     });
 
     return context.json(
@@ -255,6 +263,121 @@ app.post("/professors/:professorId/proctorships", async (context) => {
   } catch (error) {
     console.error("Error assigning student proctorship: ", error);
     return context.json("404 Error: Unable to assign student proctorship", 404);
+  }
+});
+
+app.get("/students/:studentId/library-membership", async (context) => {
+  const studentId = context.req.param("studentId");
+  try {
+    const existStudent = await prisma.student.findUnique({
+      where: {
+        id: studentId
+      },
+    });
+    if (!existStudent) {
+      return context.json("404 Error: Unable to find student data.", 404);
+    }
+
+    const existLibraryMembership = await prisma.libraryMembership.findUnique({
+      include: {
+        student: true,
+      },
+      where: {
+        studentId: studentId
+      },
+    });
+    if (!existLibraryMembership) {
+      return context.json("404 Error: Unable to find library membership data.", 404);
+    }
+
+    return context.json(existLibraryMembership, 200);
+
+  } catch (error) {
+    console.error("Error getting student library membership: ", error);
+    return context.json("404 Error: Unable to get student library membership", 404);
+  }
+});
+
+app.post("/students/:studentId/library-membership", async (context) => {
+  const {studentId} = context.req.param();
+  const { issueDate, expiryDate } = await context.req.json();
+
+  try {
+
+    const existStudent = await prisma.student.findUnique({
+      where: {
+        id: studentId
+      },
+    });
+    if (!existStudent) {
+      return context.json("404 Error: Unable to find student data.", 404);
+    }
+
+    const existLibraryMembership = await prisma.libraryMembership.findUnique({
+      where: {
+        studentId: studentId
+      },
+    });
+    if (existLibraryMembership) {
+      return context.json(
+        "400 Error: Student already has a library membership.", 400);
+    }     
+
+    const libraryMembership = await prisma.libraryMembership.create({
+      data: {
+        studentId: studentId,
+        issueDate: issueDate,
+        expiryDate: expiryDate,
+      },
+    });
+
+    return context.json(libraryMembership, 200);
+  } catch (error) {
+    console.error("Error creating library membership: ", error);
+    return context.json("404 Error: Unable to create library membership", 404);
+  }
+});
+
+app.patch("/students/:studentId/library-membership", async (context) => {
+  const studentId = context.req.param("studentId");
+  const { issueDate, expiryDate } = await context.req.json();
+
+  try {
+    const existStudent = await prisma.student.findUnique({
+      where: {
+        id: studentId
+      },
+    });
+    if (!existStudent) {
+      return context.json("404 Error: Unable to find student data.", 404);
+    }
+
+    const existLibraryMembership = await prisma.libraryMembership.findUnique({
+      where: {
+        studentId: studentId
+      },
+    });
+    if (!existLibraryMembership) {
+      return context.json(
+        "404 Error: Unable to find library membership data.",
+        404
+      );
+    }
+
+    const updatedLibraryMembership = await prisma.libraryMembership.update({
+      where: {
+        studentId: studentId
+      },
+      data: {
+        issueDate: issueDate,
+        expiryDate: expiryDate,
+      },
+    });
+
+    return context.json(updatedLibraryMembership, 200);
+  } catch (error) {
+    console.error("Error updating library membership: ", error);
+    return context.json("404 Error: Unable to update library membership", 404);
   }
 });
 

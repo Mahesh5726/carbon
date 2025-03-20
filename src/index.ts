@@ -5,9 +5,14 @@ import { Hono } from "hono";
 const app = new Hono();
 const prisma = new PrismaClient();
 
+//1. Retrieve all students in the college.
 app.get("/students", async (context) => {
   try {
-    const student = await prisma.student.findMany();
+    const student = await prisma.student.findMany({
+      include: {
+        libraryMembership: true
+      }
+    });
     return context.json(student);
   } catch (error) {
     console.error("Error finding student data: ", error);
@@ -15,6 +20,7 @@ app.get("/students", async (context) => {
   }
 });
 
+//2. Retrieve all students in the college along with their proctor details.
 app.get("/students/enriched", async (context) => {
   try {
     const enriched = await prisma.student.findMany({
@@ -29,6 +35,7 @@ app.get("/students/enriched", async (context) => {
   }
 });
 
+//3. Retrieve all professors in the college.
 app.get("/professors", async (context) => {
   try {
     const professor = await prisma.professor.findMany();
@@ -39,6 +46,7 @@ app.get("/professors", async (context) => {
   }
 });
 
+//4. Create a new student, ensuring no duplicates based on Aadhar number.
 app.post("/students", async (context) => {
   const { name, dateOfBirth, aadharNumber } = await context.req.json();
   try {
@@ -48,7 +56,7 @@ app.post("/students", async (context) => {
       },
     });
     if (aadharExists) {
-      return context.json("Error: Aadhar number already exists.", 400);
+      return context.json("Error: Aadhar number already exists.", 404);
     }
 
     const student = await prisma.student.create({
@@ -61,10 +69,11 @@ app.post("/students", async (context) => {
     return context.json(student, 200);
   } catch (error) {
     console.error("Error creating student: ", error);
-    return context.json("404 Error: Unable to create a student data.", 400);
+    return context.json("404 Error: Unable to create a student data.", 404);
   }
 });
 
+//5. Create a new professor, ensuring no duplicates based on Aadhar number.
 app.post("/professors", async (context) => {
   const { name, seniority, aadharNumber } = await context.req.json();
   try {
@@ -75,7 +84,7 @@ app.post("/professors", async (context) => {
     });
 
     if (aadharExists) {
-      return context.json("Error: Aadhar number already exists.", 400);
+      return context.json("Error: Aadhar number already exists.", 404);
     }
 
     const prof = await prisma.professor.create({
@@ -93,6 +102,7 @@ app.post("/professors", async (context) => {
   }
 });
 
+//6. Returns all students under the proctorship of the given professor.
 app.get("/professors/:professorId/proctorships", async (context) => {
   const professorId = context.req.param("professorId");
   try {
@@ -108,6 +118,7 @@ app.get("/professors/:professorId/proctorships", async (context) => {
   }
 });
 
+//7. Updates the details of a student by their id.
 app.patch("/students/:studentId", async (context) => {
   const studentId = context.req.param("studentId");
   const { name, dateOfBirth, aadharNumber, proctorId } =
@@ -118,12 +129,10 @@ app.patch("/students/:studentId", async (context) => {
         id: studentId,
       },
     });
-
-    //does proctorId exists or not
-
     if (!uniqueStudentId) {
       return context.json("404 Error: Unable to find student data.", 404);
     }
+
     const student = await prisma.student.update({
       where: {
         id: studentId,
@@ -142,6 +151,7 @@ app.patch("/students/:studentId", async (context) => {
   }
 });
 
+//8. Updates the details of a professor by their id.
 app.patch("/professors/:professorId", async (context) => {
   const professorId = context.req.param("professorId");
   const { name, seniority, aadharNumber } = await context.req.json();
@@ -172,6 +182,7 @@ app.patch("/professors/:professorId", async (context) => {
   }
 });
 
+//9. Deletes a student by their id.
 app.delete("/students/:studentId", async (context) => {
   const studentId = context.req.param("studentId");
   try {
@@ -198,6 +209,7 @@ app.delete("/students/:studentId", async (context) => {
   }
 });
 
+//10. Deletes a professor by their id.
 app.delete("/professors/:professorId", async (context) => {
   const profId = context.req.param("professorId");
   try {
@@ -224,6 +236,7 @@ app.delete("/professors/:professorId", async (context) => {
   }
 });
 
+//11. Assigns a student under the proctorship of the professor referenced by professorId.
 app.post("/professors/:professorId/proctorships", async (context) => {
   const profId = context.req.param("professorId");
   const { studentId } = await context.req.json();
@@ -266,6 +279,7 @@ app.post("/professors/:professorId/proctorships", async (context) => {
   }
 });
 
+//12. Returns the library membership details of the specified student.
 app.get("/students/:studentId/library-membership", async (context) => {
   const studentId = context.req.param("studentId");
   try {
@@ -298,6 +312,7 @@ app.get("/students/:studentId/library-membership", async (context) => {
   }
 });
 
+//13. Creates a library membership for the specified student. Ensure no duplicate library memberships for a student.
 app.post("/students/:studentId/library-membership", async (context) => {
   const {studentId} = context.req.param();
   const { issueDate, expiryDate } = await context.req.json();
@@ -320,7 +335,7 @@ app.post("/students/:studentId/library-membership", async (context) => {
     });
     if (existLibraryMembership) {
       return context.json(
-        "400 Error: Student already has a library membership.", 400);
+        "404 Error: Student already has a library membership.", 404);
     }     
 
     const libraryMembership = await prisma.libraryMembership.create({
@@ -338,11 +353,13 @@ app.post("/students/:studentId/library-membership", async (context) => {
   }
 });
 
+//14. Updates the library membership details of the specified student.
 app.patch("/students/:studentId/library-membership", async (context) => {
-  const studentId = context.req.param("studentId");
+  const {studentId} = context.req.param();
   const { issueDate, expiryDate } = await context.req.json();
 
   try {
+
     const existStudent = await prisma.student.findUnique({
       where: {
         id: studentId
@@ -380,5 +397,44 @@ app.patch("/students/:studentId/library-membership", async (context) => {
     return context.json("404 Error: Unable to update library membership", 404);
   }
 });
+
+//15. Deletes the library membership of the specified student.
+app.delete("/students/:studentId/library-membership", async (context) => {
+  const {studentId} = context.req.param();
+
+  try {
+
+    const existStudent = await prisma.student.findUnique({
+      where: {
+        id: studentId
+      },
+    });
+    if (!existStudent) {
+      return context.json("404 Error: Unable to find student data.", 404);
+    }
+
+    const existLibraryMembership = await prisma.libraryMembership.findUnique({
+      where: {
+        studentId: studentId
+      },
+    });
+    if (!existLibraryMembership) {
+      return context.json("404 Error: Unable to find library membership data.", 404);
+    };
+
+    const deletedLibraryMembership = await prisma.libraryMembership.delete({
+      where: {
+        studentId: studentId
+      },
+    });
+
+    return context.json({ "Deleted Library Membership": deletedLibraryMembership }, 200);
+
+  } catch (error) {
+    console.error("Error deleting library membership:", error);
+    return context.json("404 Error: Unable to delete library membership", 404);
+  }
+});
+
 
 serve(app);
